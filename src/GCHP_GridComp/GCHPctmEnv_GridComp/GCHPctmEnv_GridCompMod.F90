@@ -59,6 +59,8 @@
       real(r8), parameter :: GPKG   = 1000.0d0
       real(r8), parameter :: MWTAIR =   28.96d0
 
+      logical             :: invert_met
+
 !-------------------------------------------------------------------------
       CONTAINS
 !-------------------------------------------------------------------------
@@ -410,6 +412,7 @@
       type (ESMF_Config)            :: CF
       integer                       :: dims(3)
       integer :: comm
+      integer :: temp_int
 
       !  Get my name and set-up traceback handle
       !  ---------------------------------------
@@ -442,6 +445,11 @@
       jm = dims(2)
       km = dims(3)
     
+      call MAPL_GetResource( ggState, temp_int, label='INVERT_MET:', & 
+                             default=0, rc=status )
+      _VERIFY(STATUS)
+      invert_met = (temp_int > 0)
+
       ! Get the time-step
       ! -----------------------
       !call MAPL_GetResource( ggState, ndt, 'RUN_DT:', default=0, RC=STATUS )
@@ -532,6 +540,9 @@
       real,     pointer, dimension(:,:,:) ::   DryPLE0 => null()
       real,     pointer, dimension(:,:,:) ::   DryPLE1 => null()
 
+      real,     pointer, dimension(:,:,:) ::    cSPHU0 => null()
+      real,     pointer, dimension(:,:,:) ::    cSPHU1 => null()
+
       integer               :: km, k, is, ie, js, je, lm, l, ik
       integer               :: ndt, isd, ied, jsd, jed
       real(r8), allocatable :: AP(:), BP(:)
@@ -608,10 +619,23 @@
       VC(:,:,:) = VA(:,:,:)
       call A2D2C(U=UC, V=VC, npz=lm, getC=.true.)
 
+      ALLOCATE(cSPHU0(is:ie,js:je,lm), STAT=STATUS)
+      _VERIFY(STATUS)
+      ALLOCATE(cSPHU1(is:ie,js:je,lm), STAT=STATUS)
+      _VERIFY(STATUS)
+
+      if (invert_met) then
+         cSPHU0 = SPHU0
+         cSPHU1 = SPHU1
+      else
+         cSPHU0 = SPHU0(:,:,LM:1:-1) 
+         cSPHU1 = SPHU1(:,:,LM:1:-1) 
+      end if
+
       ! Calcaulate PLE0/1 - M.Long
       ! ---------------------
 #include "GEOS_HyCoords.H"
-      
+     
       ! Calculate dry surface pressure in hPa
       Do J=js,je
       Do I=is,ie
@@ -624,12 +648,12 @@
             PEdge_Bot = AP(L  ) + BP(L  ) * PS0(I,J)
             PEdge_Top = AP(L+1) + BP(L+1) * PS0(I,J)
             PSDry0    = PSDry0 + (PEdge_Bot - PEdge_Top) & 
-                               * (1.d0 - SPHU0(I,J,L))
+                               * (1.d0 - cSPHU0(I,J,L))
             ! Post-advection
             PEdge_Bot = AP(L  ) + BP(L  ) * PS1(I,J)
             PEdge_Top = AP(L+1) + BP(L+1) * PS1(I,J)
             PSDry1    = PSDry1 + (PEdge_Bot - PEdge_Top) & 
-                               * (1.d0 - SPHU1(I,J,L))
+                               * (1.d0 - cSPHU1(I,J,L))
          End Do
          ! Work back up from the surface to get dry level edges
          ! Do wet pressure at the same time - why not
@@ -642,6 +666,7 @@
       End Do
       End Do
 
+      DEALLOCATE(cSPHU0, cSPHU1)
 
       ! Arrays were calculated so that 1 = Surface
       ! FV3 wants 1 = TOA, LM+1 = Surface
@@ -650,8 +675,11 @@
       DryPLE1r8(:,:,:) = DryPLE1r8(:,:,LM:0:-1)
       PLE0r8   (:,:,:) = PLE0r8   (:,:,LM:0:-1)
       PLE1r8   (:,:,:) = PLE1r8   (:,:,LM:0:-1)
-      UC       (:,:,:) =  UC      (:,:,LM:1:-1)
-      VC       (:,:,:) =  VC      (:,:,LM:1:-1)
+      
+      if (invert_met) then
+         UC       (:,:,:) =  UC      (:,:,LM:1:-1)
+         VC       (:,:,:) =  VC      (:,:,LM:1:-1)
+      end if
 
       DEALLOCATE( AP, BP )
 
