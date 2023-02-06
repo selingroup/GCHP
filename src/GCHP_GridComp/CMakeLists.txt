@@ -3,10 +3,11 @@
 #---------------
 # Set cmake logicals needed for subprojects
 #---------------
-set(FV_PRECISION          R8   ) # FV3 precision is R8
-set(HEMCO_EXTERNAL_CONFIG TRUE ) # Not HEMCO standalone
-set(GC_EXTERNAL_CONFIG    TRUE ) # Not GEOS-Chem Classic
-set(MAPL_ESMF             TRUE ) # HEMCO and GEOS-Chem will use MAPL/ESMF
+set(FV_PRECISION          R8    ) # FV3 precision is R8
+set(HEMCO_EXTERNAL_CONFIG TRUE  ) # Not HEMCO standalone
+set(GC_EXTERNAL_CONFIG    TRUE  ) # Not GEOS-Chem Classic
+set(MAPL_ESMF             TRUE  ) # HEMCO and GEOS-Chem will use MAPL/ESMF
+set(OMP                   FALSE ) # Do not use OpenMP
 
 #---------------
 # Add FV3
